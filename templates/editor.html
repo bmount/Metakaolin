@@ -60,12 +60,12 @@
         <a href class="delete">∉ Remove shape</a>
     </div>
 
-    <div id=sketch_capture><canvas height=3000 width=3000 id=intermediate></canvas></div>
+    <div id=sketch_capture></canvas></div>
 
     <div id="map"></div>
 
     <script>
-        var yOff = 40; // top
+        var yOff = 40;
 
         var po = org.polymaps,
             map = po.map().container(d3.select('#map').append("svg:svg")
@@ -136,11 +136,28 @@
         });
 
         var sketchCoords = [];
-        var done = false;
         var sketchDiv = d3.select("#sketch_capture")
-        var ctx = d3.select("#intermediate").node().getContext("2d")
+        var ctx = sketchDiv.append("canvas")
+                .attr("id", "intermediate")
+                .attr("height", screen.height+'px')
+                .attr("width", screen.width+'px')
+                .node().getContext("2d")
         ctx.strokeStyle = 'rgba(0,0,200,.47)'
         ctx.lineWidth = 12;
+
+        function clear () {
+            // trouble with clearrect on big canvas or
+            // within the behavior drag object or something
+            var rectx = d3.select("#sketch_capture")
+            rectx.selectAll("canvas").remove()
+            ctx = rectx.append("canvas")
+                .attr("id", "intermediate")
+                .attr("height", ctx.canvas.height)
+                .attr("width", ctx.canvas.width)
+                .node().getContext('2d')
+            ctx.strokeStyle = 'rgba(0,0,200,.47)'
+            ctx.lineWidth = 12;
+        }
 
         function simple (vertices) {
           return simplify(vertices.map(
@@ -152,13 +169,8 @@
             })
         }
 
-        function clear () {
-            ctx.clearRect(0,0,ctx.canvas.width-10, ctx.canvas.height-10);
-        }
-
         var sketch = d3.behavior.drag()
             .on("drag", function () {
-                if (done) return;
                 var x = d3.event.x,
                     y = d3.event.y,
                     pos = map.pointLocation({x:x, y:y-yOff});
@@ -171,21 +183,20 @@
                     }
                     ctx.stroke()
                 }
+                else {
+                }
             })
             .on("dragend", function () {
-                clear();
                 sketchDiv.style("z-index", -1)
                 sketchCoords.push(sketchCoords[0]);
                 addFeature( { type: "Polygon",
                         coordinates: [ simple (sketchCoords) ] } )
                 sketchCoords = [];
-                clear();
             })
 
         d3.select('#doc_controls .sketch').on('click', function () {
             d3.event.preventDefault();
             sketchCoords = [];
-            clear();
             sketchDiv.style("z-index", 2);
         });
 
@@ -211,6 +222,8 @@
         function addFeature(geom) {
             if (geom) var geom = geom;
             else { 
+                var size = 0.00125,
+                    center = map.center();
                 geom = {type:"Polygon", coordinates:[[]]};
                 geom.coordinates[0].push([center.lon - size, center.lat + size]);
                 geom.coordinates[0].push([center.lon + size, center.lat + size]);
@@ -218,8 +231,6 @@
                 geom.coordinates[0].push([center.lon - size, center.lat - size]);
                 geom.coordinates[0].push([center.lon - size, center.lat + size]);
             }
-            size = 0.00125,
-            center = map.center();
             if (0) {
                 geom.type = (1) ? "LineString" : "MultiPoint";
                 geom.coordinates = geom.coordinates[0];
@@ -250,9 +261,7 @@
         }
         function deleteEdited() {
             var removedFeature = featureCollection.features.filter(function (f) { return f.geometry === editingGeometry; })[0];
-            console.log(featureCollection.features.length);
             featureCollection.features = featureCollection.features.filter(function (f) { return f !== removedFeature; });
-            console.log(featureCollection.features.length);
             updateFeatures();
             finishEditing();
         }
@@ -272,6 +281,7 @@
             saveEdits();
         });
         d3.select('#shape_controls .delete').on('click', function () {
+            clear();
             d3.event.preventDefault();
             deleteEdited();
         });
