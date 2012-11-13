@@ -4,12 +4,12 @@
     <meta charset="utf-8">
     <title>Metakaolin — Edit "{{ title }}"</title>
     <!-- -->
-    <script src="{{app_url}}/d3.min.js"></script>
-    <script src="{{app_url}}/d3.geo.min.js"></script>
+    <script src="{{app_url}}/d3.v2.min.js"></script>
     <script src="{{app_url}}/fermata.min.js"></script>
     <script src="{{app_url}}/polymaps.min.js"></script>
     <script src="{{app_url}}/polymaps.editor.js"></script>
     <script src="{{app_url}}/polymaps.viewer.js"></script>
+    <script src="{{app_url}}/simplify-min.js"></script>
     <!-- -->
 
     <!-- temporary: allow quicker local development
@@ -22,7 +22,13 @@
     <!-- /temporary -->
 
     <style>
-        #map { position: absolute; top: 4em; bottom: 1em; left: 0; right: 0; padding: 0; margin: 0; }
+        #map { position: absolute; top: 40px; bottom: 1em; left: 0; right: 0; padding: 0; margin: 0; }
+        #sketch_capture { position: absolute;
+            top: 0px;
+            height: 100%;
+            width: 100%;
+            z-index: -1;
+        }
 
         #shape_controls, .editing_shape #doc_controls { display: none; }
         #doc_controls, .editing_shape #shape_controls { display: block; }
@@ -42,20 +48,25 @@
         <!--<a href="{{app_url}}/_show/viewer/{{id}}">Cancel</a>-->
         <!--<a href="{{app_url}}/_show/files/{{id}}">Files...</a>-->
         <input name="title" placeholder="Document title" value="{{ title }}"></input>
-        <button class="save" disabled>Save</button><br>
+        <button class="save" disabled>Save</button>
         <a href class="add">⫀ Add shape</a>
+        <a href class="sketch">⫀ sketch</a>
         <textarea id="geojson_content" name="content" hidden>{{ content }}</textarea>
     </form>
     <div id="shape_controls">
         <a href class="cancel">← Cancel</a>
         <!--<a href>Fields...</a>-->
-        <button class="save" type="button">Done</button><br>
+        <button class="save" type="button">Done</button>
         <a href class="delete">∉ Remove shape</a>
     </div>
+
+    <div id=sketch_capture><canvas height=3000 width=3000 id=intermediate></canvas></div>
 
     <div id="map"></div>
 
     <script>
+        var yOff = 40; // top
+
         var po = org.polymaps,
             map = po.map().container(d3.select('#map').append("svg:svg")
               .attr("height", "100%")
@@ -69,9 +80,9 @@
             e.tile.element.width.baseVal.value += 1;
             e.tile.element.height.baseVal.value += 1;
         });
-        if (1) tiles.url(po.url("http://temp{S}.argyl.es/preview-key"
+        if (0) tiles.url(po.url("http://temp{S}.argyl.es/preview-key"
             + "/{Z}/{X}/{Y}.jpg").hosts([1, 2, 3]));
-        else if (0) tiles.url(po.url("http://oatile{S}.mqcdn.com/naip"
+        else if (1) tiles.url(po.url("http://oatile{S}.mqcdn.com/naip"
             + "/{Z}/{X}/{Y}.jpg").hosts([1, 2, 3, 4]));
         else if (0) tiles.url(po.url("http://otile{S}.mqcdn.com/tiles/1.0.0/osm/{Z}/{X}/{Y}.jpg")
             .hosts(["1", "2", "3", "4"]))
@@ -124,10 +135,67 @@
             map.center({lat:p.coords.latitude, lon:p.coords.longitude}).zoom(14);
         });
 
+        var sketchCoords = [];
+        var done = false;
+        var sketchDiv = d3.select("#sketch_capture")
+        var ctx = d3.select("#intermediate").node().getContext("2d")
+        ctx.strokeStyle = 'rgba(0,0,200,.47)'
+        ctx.lineWidth = 12;
+
+        function simple (vertices) {
+          return simplify(vertices.map(
+                function (c) {
+                    return {x:c.lon, y:c.lat}
+                  }), .0003 ).map( // should interpolate
+                function (obj) {
+                    return [obj.x, obj.y]
+            })
+        }
+
+        function clear () {
+            ctx.clearRect(0,0,ctx.canvas.width-10, ctx.canvas.height-10);
+        }
+
+        var sketch = d3.behavior.drag()
+            .on("drag", function () {
+                if (done) return;
+                var x = d3.event.x,
+                    y = d3.event.y,
+                    pos = map.pointLocation({x:x, y:y-yOff});
+                pos.px = [x,y]
+                sketchCoords.push(pos);
+                if (sketchCoords.length > 1) {
+                    ctx.moveTo.apply(ctx, sketchCoords[0].px);
+                    for (var ri = 1; ri < sketchCoords.length; ri++) {
+                        ctx.lineTo.apply(ctx, sketchCoords[ri].px);
+                    }
+                    ctx.stroke()
+                }
+            })
+            .on("dragend", function () {
+                clear();
+                sketchDiv.style("z-index", -1)
+                sketchCoords.push(sketchCoords[0]);
+                addFeature( { type: "Polygon",
+                        coordinates: [ simple (sketchCoords) ] } )
+                sketchCoords = [];
+                clear();
+            })
+
+        d3.select('#doc_controls .sketch').on('click', function () {
+            d3.event.preventDefault();
+            sketchCoords = [];
+            clear();
+            sketchDiv.style("z-index", 2);
+        });
+
+        sketchDiv.call(sketch);
+
         d3.select('#doc_controls .add').on('click', function () {
             d3.event.preventDefault();
             addFeature();
         });
+
         d3.select('input[name=title]').on('change', function () {
             d3.select('#doc_controls .save').property('disabled', false);
         });
@@ -140,15 +208,18 @@
             }
         }, false);
 
-        function addFeature() {
-            var geom = {type:"Polygon", coordinates:[[]]},
-                size = 0.00125,
-                center = map.center();
-            geom.coordinates[0].push([center.lon - size, center.lat + size]);
-            geom.coordinates[0].push([center.lon + size, center.lat + size]);
-            geom.coordinates[0].push([center.lon + size, center.lat - size]);
-            geom.coordinates[0].push([center.lon - size, center.lat - size]);
-            geom.coordinates[0].push([center.lon - size, center.lat + size]);
+        function addFeature(geom) {
+            if (geom) var geom = geom;
+            else { 
+                geom = {type:"Polygon", coordinates:[[]]};
+                geom.coordinates[0].push([center.lon - size, center.lat + size]);
+                geom.coordinates[0].push([center.lon + size, center.lat + size]);
+                geom.coordinates[0].push([center.lon + size, center.lat - size]);
+                geom.coordinates[0].push([center.lon - size, center.lat - size]);
+                geom.coordinates[0].push([center.lon - size, center.lat + size]);
+            }
+            size = 0.00125,
+            center = map.center();
             if (0) {
                 geom.type = (1) ? "LineString" : "MultiPoint";
                 geom.coordinates = geom.coordinates[0];
@@ -195,6 +266,8 @@
             finishEditing();
         });
         d3.select('#shape_controls .save').on('click', function () {
+            clear();
+            sketchCoords = [];
             d3.event.preventDefault();
             saveEdits();
         });
