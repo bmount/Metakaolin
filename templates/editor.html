@@ -11,7 +11,7 @@
     <script src="{{app_url}}/polymaps.editor.js"></script>
     <script src="{{app_url}}/polymaps.viewer.js"></script>
     <!-- -->
-    
+
     <!-- temporary: allow quicker local development
     <script src="../_attachments/d3.min.js"></script>
     <script src="../_attachments/d3.geo.min.js"></script>
@@ -20,13 +20,13 @@
     <script src="../_attachments/polymaps.editor.js"></script>
     <script src="../_attachments/polymaps.viewer.js"></script>
     <!-- /temporary -->
-    
+
     <style>
         #map { position: absolute; top: 4em; bottom: 1em; left: 0; right: 0; padding: 0; margin: 0; }
-        
+
         #shape_controls, .editing_shape #doc_controls { display: none; }
         #doc_controls, .editing_shape #shape_controls { display: block; }
-        
+
         .viewer { fill: grey; fill-opacity: 0.5; stroke: black; }
         .viewer polyline { fill: none !important; stroke-width: 3px; }
         .viewer .hover { fill-opacity: 0.25; stroke-opacity: 0.75; }
@@ -52,9 +52,9 @@
         <button class="save" type="button">Done</button><br>
         <a href class="delete">∉ Remove shape</a>
     </div>
-    
+
     <div id="map"></div>
-    
+
     <script>
         var po = org.polymaps,
             map = po.map().container(d3.select('#map').append("svg:svg")
@@ -62,7 +62,7 @@
               .attr("width", "100%")
               .node());
         map.add(po.interact());
-        
+
         // TODO: properly attribute whichever layer is used
         var tiles = po.image().on('load', function (e) {
             // https://github.com/simplegeo/polymaps/issues/36
@@ -82,12 +82,12 @@
         else tiles.url(po.url("http://{S}tile.openstreetmap.org/{Z}/{X}/{Y}.png")
             .hosts(["a.", "b.", "c.", ""]));
         map.add(tiles);
-        
-        
+
+
         var vector = po_metakaolin_viewer(),
             editor = po_metakaolin_editor();
         map.add(vector).add(editor);
-        
+
         d3.select(vector.container()).classed('viewer', true);
         vector.on('show', function (loadEvent) {
             loadEvent.features.forEach(function (f,i) {
@@ -103,7 +103,7 @@
                 }).classed('color' + (i % 3), true).classed('editing', f.data.geometry === editingGeometry);
             });
         });
-        
+
         var geoJsonEl = d3.select("#geojson_content").node(),
             featureCollection = (geoJsonEl.value) ? JSON.parse(geoJsonEl.value) : null;
         function updateFeatures() {
@@ -115,7 +115,7 @@
             featureCollection = {type:"FeatureCollection", features:[]};
             updateFeatures();
         }
-        
+
         if (featureCollection.features.length) {
             var bounds = d3.geo.bounds(featureCollection).map(function (c) { return {lon:c[0], lat:c[1]}; });
             vector.features(featureCollection.features);
@@ -123,7 +123,7 @@
         } else if (navigator.geolocation) navigator.geolocation.getCurrentPosition(function (p) {
             map.center({lat:p.coords.latitude, lon:p.coords.longitude}).zoom(14);
         });
-        
+
         d3.select('#doc_controls .add').on('click', function () {
             d3.event.preventDefault();
             addFeature();
@@ -139,7 +139,7 @@
                 return 'You have unsaved changes that will be lost.';
             }
         }, false);
-        
+
         function addFeature() {
             var geom = {type:"Polygon", coordinates:[[]]},
                 size = 0.00125,
@@ -160,7 +160,7 @@
             updateFeatures();
             editGeometry(geom);
         }
-        
+
         var editingGeometry = null;
         function editGeometry(geom) {
             d3.select(document.body).classed('editing_shape', true);
