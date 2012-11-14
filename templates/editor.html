@@ -142,12 +142,13 @@
                 .attr("height", screen.height+'px')
                 .attr("width", screen.width+'px')
                 .node().getContext("2d")
-        ctx.strokeStyle = 'rgba(0,0,200,.47)'
+        ctx.strokeStyle = 'rgba(0,0,200,.27)'
         ctx.lineWidth = 12;
 
         function clear () {
             // trouble with clearrect on big canvas or
             // within the behavior drag object or something
+            sketchDiv.style("z-index", -1)
             var rectx = d3.select("#sketch_capture")
             rectx.selectAll("canvas").remove()
             ctx = rectx.append("canvas")
@@ -155,7 +156,7 @@
                 .attr("height", ctx.canvas.height)
                 .attr("width", ctx.canvas.width)
                 .node().getContext('2d')
-            ctx.strokeStyle = 'rgba(0,0,200,.47)'
+            ctx.strokeStyle = 'rgba(0,0,200,.27)'
             ctx.lineWidth = 12;
         }
 
@@ -163,40 +164,56 @@
           return simplify(vertices.map(
                 function (c) {
                     return {x:c.lon, y:c.lat}
-                  }), .0003 ).map( // should interpolate
+                  }), (.0001)*Math.pow(18/map.zoom(), 5) ).map( // should interpolate
                 function (obj) {
                     return [obj.x, obj.y]
             })
         }
 
+        var x0, y0, dx, dy, adx, ady;
         var sketch = d3.behavior.drag()
+            .on("dragstart", function () {
+                sketchCoords = [];
+                dx = 0
+                dy = 0
+                adx = 0
+                ady = 0
+            })
             .on("drag", function () {
                 var x = d3.event.x,
                     y = d3.event.y,
                     pos = map.pointLocation({x:x, y:y-yOff});
+                if (!x0) {
+                    x0 = x;
+                    y0 = y;
+                    ctx.moveTo(x0, y0);
+                }
                 pos.px = [x,y]
                 sketchCoords.push(pos);
-                if (sketchCoords.length > 1) {
-                    ctx.moveTo.apply(ctx, sketchCoords[0].px);
-                    for (var ri = 1; ri < sketchCoords.length; ri++) {
-                        ctx.lineTo.apply(ctx, sketchCoords[ri].px);
-                    }
-                    ctx.stroke()
-                }
-                else {
-                }
+                ctx.lineTo(x,y);
+                ctx.stroke()
+                dx += d3.event.dx
+                dy += d3.event.dy
+                adx += Math.abs(d3.event.dx)
+                ady += Math.abs(d3.event.dx)
             })
             .on("dragend", function () {
-                sketchDiv.style("z-index", -1)
-                sketchCoords.push(sketchCoords[0]);
-                addFeature( { type: "Polygon",
-                        coordinates: [ simple (sketchCoords) ] } )
-                sketchCoords = [];
+                var geomType = ((dx/adx + dy/ady) > .1)? "LineString": "Polygon"
+                if (geomType === "Polygon") sketchCoords.push(sketchCoords[0]);
+                addFeature( { type: geomType,
+                    coordinates: (geomType === "Polygon")?
+                    [ simple (sketchCoords) ]
+                    : simple (sketchCoords)
+                } )
+                x0 = false;
+                y0 = false;
+                sketchDiv.style("z-index", -1);
+                //clear();
+                ctx.clearRect(0,0,ctx.canvas.width,ctx.canvas.height);
             })
 
         d3.select('#doc_controls .sketch').on('click', function () {
             d3.event.preventDefault();
-            sketchCoords = [];
             sketchDiv.style("z-index", 2);
         });
 
@@ -221,10 +238,10 @@
 
         function addFeature(geom) {
             if (geom) var geom = geom;
-            else { 
+            else {
                 var size = 0.00125,
                     center = map.center();
-                geom = {type:"Polygon", coordinates:[[]]};
+                var geom = {type:"Polygon", coordinates:[[]]};
                 geom.coordinates[0].push([center.lon - size, center.lat + size]);
                 geom.coordinates[0].push([center.lon + size, center.lat + size]);
                 geom.coordinates[0].push([center.lon + size, center.lat - size]);
@@ -260,7 +277,8 @@
             finishEditing();
         }
         function deleteEdited() {
-            var removedFeature = featureCollection.features.filter(function (f) { return f.geometry === editingGeometry; })[0];
+            var removedFeature = featureCollection.features.filter(function (f) {
+                return f.geometry === editingGeometry; })[0];
             featureCollection.features = featureCollection.features.filter(function (f) { return f !== removedFeature; });
             updateFeatures();
             finishEditing();
@@ -275,15 +293,14 @@
             finishEditing();
         });
         d3.select('#shape_controls .save').on('click', function () {
-            clear();
-            sketchCoords = [];
             d3.event.preventDefault();
             saveEdits();
+            clear();
         });
         d3.select('#shape_controls .delete').on('click', function () {
-            clear();
             d3.event.preventDefault();
             deleteEdited();
+            clear();
         });
     </script>
 </body>
