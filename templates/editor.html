@@ -210,8 +210,8 @@
         var sketchDiv = d3.select("#sketch_capture")
         var ctx = sketchDiv.append("canvas")
                 .attr("id", "intermediate")
-                .attr("height", screen.height+'px')
-                .attr("width", screen.width+'px')
+                .attr("height", window.innerHeight+'px')
+                .attr("width", window.innerWidth+'px')
                 .node().getContext("2d")
         ctx.strokeStyle = 'rgba(0,0,200,.27)'
         ctx.lineWidth = 12;
