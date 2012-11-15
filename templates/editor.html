@@ -29,9 +29,11 @@
             width: 100%;
             z-index: -1;
         }
+        #attrib { position: absolute; bottom: 2px; z-index: 3; font-size: .6em; }
 
         #shape_controls, .editing_shape #doc_controls { display: none; }
         #doc_controls, .editing_shape #shape_controls { display: block; }
+        #switcher { position: absolute; top: 10px; right: 200px; }
 
         .viewer { fill: grey; fill-opacity: 0.5; stroke: black; }
         .viewer polyline { fill: none !important; stroke-width: 3px; }
@@ -60,9 +62,11 @@
         <a href class="delete">∉ Remove shape</a>
     </div>
 
+    <form id=switcher><a href="">change basemap</a></form>
     <div id=sketch_capture></canvas></div>
 
     <div id="map"></div>
+    <div id=attrib></div>
 
     <script>
         var yOff = 40;
@@ -74,26 +78,93 @@
               .node());
         map.add(po.interact());
 
+        var tileset0 = "argyl.es";
+
+        var osmAttribution = 'Data by <a href="http://openstreetmap.org">OpenStreetMap</a>, '
+            +'<a href="http://www.openstreetmap.org/copyright">ODbL</a>.'
+        var stamenAttribution = 'Map tiles by <a'
+            +'href="http://stamen.com">Stamen Design</a>, under <a'
+            +'href="http://creativecommons.org/licenses/by/3.0">CC BY 3.0</a>.'
+        var mapQuestAttribution = '<a href="http://developer.mapquest.com/web/products/open/map">'
+            +'MapQuest</a>'
+
+        var tileFlavors = {
+            "argyl.es": {
+                url: "http://temp{S}.argyl.es/preview-key/{Z}/{X}/{Y}.jpg",
+                hosts: [1,2,3],
+                attribution: ["Nathan Vander Wilt", "?contributors"],
+                zMax: 18
+            },
+            "Stamen Toner": {
+                url: "http://tile.stamen.com/toner/{Z}/{X}/{Y}.png",
+                hosts: [],
+                attribution: [stamenAttribution, osmAttribution],
+                zMax: 18
+            },
+            "Stamen Terrain": {
+                url: "http://tile.stamen.com/terrain/{Z}/{X}/{Y}.png",
+                hosts: [],
+                attribution: [stamenAttribution, osmAttribution],
+                zMax: 18
+            },
+            "Mapbox Light": {
+                url: "http://{S}.tiles.mapbox.com/v3/mapbox.world-light/{Z}/{X}/{Y}.png",
+                hosts: ['a', 'b', 'c', 'd'],
+                attribution: ['<a href="http://mapbox.com">MapBox</a>', "Natural Earth"],
+                zMax: 11
+            },
+            "Blue Marble": {
+                url:
+                "http://s3.amazonaws.com/com.modestmaps.bluemarble/{Z}-r{Y}-c{X}.jpg",
+                hosts: [],
+                attribution: ["ModestMaps project,", "NASA"],
+                zMax: 8
+              },
+            "MapQuest Open Aerial": {
+                url: "http://oatile{S}.mqcdn.com/naip/{Z}/{X}/{Y}.jpg",
+                hosts: [1, 2, 3],
+                attribution: [mapQuestAttribution, osmAttribution],
+                zMax: 18
+            },
+            "MapQuest OSM": {
+                url:
+                "http://otile{S}.mqcdn.com/tiles/1.0.0/osm/{Z}/{X}/{Y}.jpg",
+                hosts: [1, 2, 3, 4],
+                attribution: [mapQuestAttribution, osmAttribution],
+                zMax: 18
+              },
+            "OpenStreetMap": {
+                url: "http://{S}.tile.openstreetmap.org/{Z}/{X}/{Y}.png",
+                hosts: ["a", "b", "c"],
+                attribution: [osmAttribution],
+                zMax: 18
+              },
+            "Open Cycle Map": {
+                url: "http://{S}.tile.opencyclemap.org/cycle/{Z}/{X}/{Y}.png",
+                hosts: ["a", "b", "c"],
+                attribution: ['<a href="http://opencyclemap.org">Open Cycle Map</a>',
+                                osmAttribution],
+                zMax: 18
+              },
+            "Google Terrain": {
+                url:
+                'http://mts1.google.com/vt/lyrs=t@128,r@179150048&hl=en&x={X}&y={Y}&z={Z}',
+                hosts: [],
+                attribution: ['(c) Google Inc.'],
+                zMax: 16
+              }
+          }
+
         // TODO: properly attribute whichever layer is used
         var tiles = po.image().on('load', function (e) {
             // https://github.com/simplegeo/polymaps/issues/36
             e.tile.element.width.baseVal.value += 1;
             e.tile.element.height.baseVal.value += 1;
         });
-        if (1) tiles.url(po.url("http://temp{S}.argyl.es/preview-key"
-            + "/{Z}/{X}/{Y}.jpg").hosts([1, 2, 3]));
-        else if (0) tiles.url(po.url("http://oatile{S}.mqcdn.com/naip"
-            + "/{Z}/{X}/{Y}.jpg").hosts([1, 2, 3, 4]));
-        else if (0) tiles.url(po.url("http://otile{S}.mqcdn.com/tiles/1.0.0/osm/{Z}/{X}/{Y}.jpg")
-            .hosts(["1", "2", "3", "4"]))
-        else if (0) tiles.url(po.url("http://{S}tile.cloudmade.com"
-            + "/51664f123b50414da85e963f92c721f0"
-            + "/998/256/{Z}/{X}/{Y}.png")
-            .hosts(["a.", "b.", "c.", ""]));
-        else tiles.url(po.url("http://{S}tile.openstreetmap.org/{Z}/{X}/{Y}.png")
-            .hosts(["a.", "b.", "c.", ""]));
-        map.add(tiles);
 
+        tiles.url(po.url(tileFlavors[tileset0].url)
+          .hosts(tileFlavors[tileset0].hosts));
+        map.add(tiles);
 
         var vector = po_metakaolin_viewer(),
             editor = po_metakaolin_editor();
@@ -139,8 +210,8 @@
         var sketchDiv = d3.select("#sketch_capture")
         var ctx = sketchDiv.append("canvas")
                 .attr("id", "intermediate")
-                .attr("height", screen.height+'px')
-                .attr("width", screen.width+'px')
+                .attr("height", window.innerHeight+'px')
+                .attr("width", window.innerWidth+'px')
                 .node().getContext("2d")
         ctx.strokeStyle = 'rgba(0,0,200,.27)'
         ctx.lineWidth = 12;
@@ -302,6 +373,35 @@
             deleteEdited();
             clear();
         });
+
+        var attrib = d3.select("#attrib");
+        function switchTiles (optionEvent) {
+          var newSet = tileFlavors[optionEvent.srcElement.value]
+          tiles.url(po.url(newSet.url)
+            .hosts(newSet.hosts))
+          attrib.html(newSet.attribution.join(' '))
+        }
+
+
+        function reTile () {
+            d3.event.preventDefault();
+            var tileForm = d3.select(this)
+            tileForm.node().onchange = switchTiles
+            tileForm.text("")
+              .append("select")
+              .attr("id", "tileselect")
+              .selectAll("option")
+              .data(d3.entries(tileFlavors).filter(function (entry) {
+                      return (entry.value.zMax >= map.zoom());
+                    }))
+             .enter()
+             .append("option")
+             .attr("value", function (d) { return d.key; })
+             .text(function (d) { return d.key; })
+        }
+
+        d3.select("#switcher").on('click', reTile)
+
     </script>
 </body>
 </html>
