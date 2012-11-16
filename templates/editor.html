@@ -33,7 +33,8 @@
 
         #shape_controls, .editing_shape #doc_controls { display: none; }
         #doc_controls, .editing_shape #shape_controls { display: block; }
-        #switcher { position: absolute; top: 10px; right: 200px; }
+        #switcher_init { position: absolute; top: 10px; right: 200px; }
+        #switch_form { position: absolute; top: 10px; right: 200px; }
 
         .viewer { fill: grey; fill-opacity: 0.5; stroke: black; }
         .viewer polyline { fill: none !important; stroke-width: 3px; }
@@ -62,8 +63,9 @@
         <a href class="delete">∉ Remove shape</a>
     </div>
 
-    <form id=switcher><a href="">change basemap</a></form>
-    <div id=sketch_capture></canvas></div>
+    <form id=switch_form></form>
+    <a id=switcher_init href="">change basemap</a>
+    <div id=sketch_capture></div>
 
     <div id="map"></div>
     <div id=attrib></div>
@@ -375,18 +377,26 @@
         });
 
         var attrib = d3.select("#attrib");
-        function switchTiles (optionEvent) {
-          var newSet = tileFlavors[optionEvent.srcElement.value]
+        var switcherInit = d3.select("#switcher_init")
+
+        function switchTiles (optionObj) {
+          var choice = d3.select(optionObj).selectAll("option")
+            .filter(function () {
+              return d3.select(this)[0][0].selected;
+          })
+          var newSet = tileFlavors[choice[0][0].value]
           tiles.url(po.url(newSet.url)
             .hosts(newSet.hosts))
           attrib.html(newSet.attribution.join(' '))
         }
 
 
-        function reTile () {
+        var tileForm = d3.select("#switch_form")
+        //tileForm.node().onchange = switchTiles
+
+        function reTile (par) {
             d3.event.preventDefault();
-            var tileForm = d3.select(this)
-            tileForm.node().onchange = switchTiles
+            if (par) d3.select(par).remove()
             tileForm.text("")
               .append("select")
               .attr("id", "tileselect")
@@ -400,7 +410,14 @@
              .text(function (d) { return d.key; })
         }
 
-        d3.select("#switcher").on('click', reTile)
+        switcherInit.on('click', function () {
+          d3.event.preventDefault();
+          reTile(this)
+        })
+
+        tileForm.on("change", function () {
+          switchTiles(this)
+        })
 
     </script>
 </body>
